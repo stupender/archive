@@ -12,6 +12,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 let mainWindow: BrowserWindow | null = null;
 let artworkDir = '';
 
+/** Shared drop folder for loops handed to Soundscape. Prefers iCloud Drive so
+ *  it syncs to the iPad/iPhone; falls back to ~/Soundscape Loops. */
+function soundscapeLoopsFolder(): string {
+  const home = app.getPath('home');
+  const icloud = path.join(home, 'Library/Mobile Documents/com~apple~CloudDocs');
+  const base = fs.existsSync(icloud) ? icloud : home;
+  return path.join(base, 'Soundscape Loops');
+}
+
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'media',
@@ -116,6 +125,20 @@ app.whenReady().then(async () => {
   ipcMain.handle('scenes:list', () => db.listScenes());
   ipcMain.handle('scenes:save', (_e, name: string, data: string) => db.saveScene(name, data));
   ipcMain.handle('scenes:delete', (_e, id: number) => db.deleteScene(id));
+
+  // --- Soundscape bridge: write a rendered loop + sidecar to the shared
+  //     iCloud "Soundscape Loops" folder (see Soundscape Docs/BRIDGE.md). The
+  //     renderer hands us the already-encoded WAV bytes and the sidecar JSON.
+  ipcMain.handle('bridge:exportLoop', async (_e, args: { baseName: string; wav: ArrayBuffer; sidecar: string }) => {
+    const folder = soundscapeLoopsFolder();
+    fs.mkdirSync(folder, { recursive: true });
+    const safeBase = args.baseName.replace(/[/\\:]/g, '-').slice(0, 80) || 'Loop';
+    let base = safeBase, i = 1;
+    while (fs.existsSync(path.join(folder, base + '.wav'))) { base = `${safeBase}-${i++}`; }
+    fs.writeFileSync(path.join(folder, base + '.wav'), Buffer.from(args.wav));
+    fs.writeFileSync(path.join(folder, base + '.json'), args.sidecar, 'utf8');
+    return { folder, filename: base + '.wav' };
+  });
 
   ipcMain.handle('library:scan', async () => {
     const onProgress = (done: number, total: number, current: string) => {

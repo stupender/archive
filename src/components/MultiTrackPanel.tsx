@@ -4,6 +4,7 @@ import { Icon } from './Icon';
 import { mediaUrl, formatTime } from '../util/format';
 import { Popover, usePopover } from './Popover';
 import { getEngine } from '../audio/engine';
+import { exportLoopToSoundscape } from '../audio/loopExport';
 
 export function MultiTrackPanel() {
   const collageTracks = useLibrary((s) => s.collageTracks);
@@ -133,6 +134,21 @@ export function MultiTrackPanel() {
             onLoopRegion={(r) => setCollageLoopRegion(idx, r)}
             onTogglePlay={() => toggleCollagePlay(idx)}
             onSeek={(t) => seekCollage(idx, t)}
+            onExport={async () => {
+              try {
+                const res = await exportLoopToSoundscape({
+                  track: c.track,
+                  mediaUrl: mediaUrl(c.track.path),
+                  loopStart: c.loopActive && c.loopRegion ? c.loopRegion.start : 0,
+                  loopEnd: c.loopActive && c.loopRegion ? c.loopRegion.end : (c.duration || 0),
+                  playbackRate: c.playbackRate,
+                  reversed: c.reversed,
+                });
+                alert(`Sent to Soundscape:\n${res.filename}`);
+              } catch (err: any) {
+                alert(`Export failed: ${err?.message || err}`);
+              }
+            }}
           />
         ))}
       </div>
@@ -239,6 +255,7 @@ interface CardProps {
   onLoopRegion: (r: { start: number; end: number } | null) => void;
   onTogglePlay: () => void;
   onSeek: (t: number) => void;
+  onExport: () => void;
 }
 
 function CollageTrackCard(props: CardProps) {
@@ -246,8 +263,9 @@ function CollageTrackCard(props: CardProps) {
     track, volume, playbackRate, reversed, loopRegion, loopActive,
     isPlaying, currentTime, duration, canReverse, canABLoop,
     onRemove, onVolume, onSpeed, onReverse, onLoopActive, onLoopStart, onLoopEnd, onLoopRegion,
-    onTogglePlay, onSeek,
+    onTogglePlay, onSeek, onExport,
   } = props;
+  const [exporting, setExporting] = useState(false);
 
   const scrubberRef = useRef<HTMLDivElement>(null);
 
@@ -439,6 +457,18 @@ function CollageTrackCard(props: CardProps) {
             onChange={(e) => onVolume(Number(e.target.value))}
           />
         </div>
+        <button
+          className={`player-btn-sm ${exporting ? 'on' : ''}`}
+          title="Send this loop to Soundscape"
+          disabled={exporting || !duration}
+          onClick={async (e) => {
+            e.currentTarget.blur();
+            setExporting(true);
+            try { await Promise.resolve(onExport()); } finally { setExporting(false); }
+          }}
+        >
+          <Icon name={exporting ? 'loop' : 'arrow-forward'} size={14} />
+        </button>
       </div>
     </div>
   );

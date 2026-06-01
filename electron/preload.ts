@@ -10,6 +10,11 @@ const api = {
   reorderLibraries: (ids: number[]) => ipcRenderer.invoke('libraries:reorder', ids) as Promise<void>,
   scan: () => ipcRenderer.invoke('library:scan') as Promise<{ added: number; updated: number; removed: number; errors: any[] }>,
 
+  // Soundscape bridge — write a rendered loop (WAV bytes) + JSON sidecar to the
+  // shared iCloud "Soundscape Loops" folder.
+  exportLoopToSoundscape: (args: { baseName: string; wav: ArrayBuffer; sidecar: string }) =>
+    ipcRenderer.invoke('bridge:exportLoop', args) as Promise<{ folder: string; filename: string }>,
+
   listScenes: () => ipcRenderer.invoke('scenes:list') as Promise<{ id: number; name: string; createdAt: number; data: string }[]>,
   saveScene: (name: string, data: string) => ipcRenderer.invoke('scenes:save', name, data) as Promise<{ id: number; name: string; createdAt: number; data: string }>,
   deleteScene: (id: number) => ipcRenderer.invoke('scenes:delete', id) as Promise<void>,
