@@ -1,3 +1,26 @@
+/**
+ * The top-level React component — the layout shell and the place where
+ * one-time app setup happens.
+ *
+ * Where it runs: renderer.
+ * Depends on: every panel/overlay component, the Zustand store
+ *   (for the `init` action and basic view state), the keyboard hook.
+ * Used by:    `src/main.tsx` mounts this.
+ *
+ * Notes:
+ *  - The layout is `Sidebar | (Topbar / content / PlayerBar)`. The
+ *    `content` slot swaps between TrackList / RandomReviewPanel /
+ *    MultiTrackPanel based on the current view.
+ *  - If no libraries exist yet, the `<EmptyState />` takes over the
+ *    content slot.
+ *  - Toast and QuickTagDialog are floated as overlays — always
+ *    rendered, but invisible until the store toggles them.
+ *  - On mount: call `init()` (which loads libraries from the DB and
+ *    subscribes to `library:changed` events from the main process),
+ *    then flip `ready` so the rest of the UI renders.
+ *  - If `window.sonic` isn't present, the preload bridge didn't load —
+ *    show a fatal error screen instead of an empty UI.
+ */
 import { useEffect, useState } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';

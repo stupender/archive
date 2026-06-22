@@ -1,3 +1,21 @@
+/**
+ * One global keyboard shortcut handler for the whole app.
+ *
+ * Where it runs: renderer (called once from `<App />`).
+ * Depends on: React, the Zustand store.
+ * Used by:    App.tsx — `useKeyboardShortcuts()` mounts a single
+ *   document-level `keydown` listener on mount.
+ *
+ * Notes:
+ *  - All shortcuts are skipped when the user is typing in an input or
+ *    textarea — except ⌘F (focus search) and ⌘L (jump to current
+ *    track), which should always work.
+ *  - Most actions read fresh state via `useLibrary.getState()` rather
+ *    than React-subscribed values, so the handler always sees the
+ *    latest (no stale-closure bugs).
+ *  - Space-to-play also blurs whatever button last had focus, so
+ *    Space doesn't accidentally re-click Loop/Shuffle/etc.
+ */
 import { useEffect } from 'react';
 import { useLibrary } from '../store/library';
 

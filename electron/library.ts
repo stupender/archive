@@ -1,3 +1,30 @@
+/**
+ * The library scanner — walks a folder, extracts metadata from each audio
+ * file, persists what it finds into the DB.
+ *
+ * Where it runs: main process (Node.js).
+ * Depends on: node:fs, music-metadata (reads ID3 / MP4 / Vorbis tags),
+ *   ./tags.js (Finder color tags via shell commands), ./db.js (persist),
+ *   node:crypto (SHA-1 of the file path for caching artwork).
+ * Used by:    main.ts's `library:scan` IPC handler;
+ *   watcher.ts calls `ingestSingleFile` when a file appears or changes.
+ *
+ * Notes:
+ *  - The scan is three phases:
+ *      1. Enumerate every audio file under every library root.
+ *      2. For each file, if the modification time hasn't changed, refresh
+ *         only the cheap "tags" data. Otherwise re-extract everything.
+ *      3. Remove DB rows for paths that didn't appear in this scan.
+ *  - DAW project folders (Ableton "… Project", Logic ".logicx", GarageBand
+ *    ".band", Pro Tools ".ptx") are skipped — the audio inside those is
+ *    stems and samples, not finished tracks.
+ *  - Embedded album art is cached at `<userData>/artwork/<sha1>.{jpg|png}`,
+ *    keyed by SHA-1 of the full file path so sibling tracks in the same
+ *    album don't collide.
+ *  - Folder names between the library root and the file become "path
+ *    tags" automatically — `…/Seeds/Mantras/foo.wav` is tagged `Seeds`
+ *    and `Mantras`.
+ */
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';

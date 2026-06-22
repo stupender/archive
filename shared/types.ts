@@ -1,3 +1,22 @@
+/**
+ * The data shapes that flow across the IPC bridge — declared once here so
+ * BOTH the main process and the renderer agree on what a Track looks like.
+ *
+ * Where it runs: type-only file (no runtime code). Imported by both
+ *   `electron/` and `src/` via the `@shared/types` alias defined in
+ *   `tsconfig.json` and `vite.config.ts`.
+ * Depends on: nothing.
+ * Used by:    db.ts, library.ts, store/library.ts, every UI component
+ *   that touches a Track or runs a filter.
+ *
+ * Notes:
+ *  - `FilterOptions` is the query language used by `db.listTracks`. The
+ *    same shape is stored as JSON in the smart-playlist `auto_query`
+ *    column — `SmartQuery` is just an alias for FilterOptions.
+ *  - Track.title is the *resolved* title (user override if present,
+ *    otherwise the value from the file's metadata) — see the
+ *    user-override pattern entry in LEARNED.md.
+ */
 export interface Library {
   id: number;
   name: string;
@@ -74,10 +93,6 @@ export interface FilterOptions {
   /** Minimum rating, inclusive (>=). */
   rating?: number;
   genre?: string;
-  /** Single-tag filter — convenience. */
-  finderTag?: string;
-  userTag?: string;
-  pathTag?: string;
   /** Multi-tag filters (AND-combined). Tracks must have ALL of these. */
   userTagsAll?: string[];
   finderTagsAll?: string[];

@@ -1,3 +1,25 @@
+/**
+ * The PRELOAD bridge — the only file that runs in BOTH worlds.
+ *
+ * Where it runs: technically in the renderer process, but with extra
+ *   privileges (it has access to Node APIs and Electron's `contextBridge`).
+ * Depends on: shared types — that's it.
+ * Used by:    everything in `src/` reaches the main process through this
+ *   bridge by calling `window.sonic.<method>`. The renderer cannot do file
+ *   IO, can't touch the DB, can't open OS dialogs — it can only call
+ *   methods exposed here.
+ *
+ * Notes:
+ *  - Each method below is a thin one-liner that forwards to an
+ *    `ipcMain.handle('thing:action', ...)` in main.ts. NO business logic
+ *    lives in this file — adding any here would be a smell. If a method
+ *    needs decisions, put them in main.ts.
+ *  - The whole API is collected into one `api` object and exposed as
+ *    `window.sonic` via `contextBridge.exposeInMainWorld('sonic', api)`.
+ *  - `toMediaUrl(path)` is a renderer-side helper, not an IPC call — it
+ *    converts a local file path into the `media://archive/...` URL the
+ *    custom protocol handler in main.ts knows how to serve.
+ */
 import { contextBridge, ipcRenderer } from 'electron';
 import type { FilterOptions, SortOption, Track, Library } from '../shared/types.js';
 
@@ -9,11 +31,6 @@ const api = {
   deleteLibrary: (id: number) => ipcRenderer.invoke('libraries:delete', id) as Promise<void>,
   reorderLibraries: (ids: number[]) => ipcRenderer.invoke('libraries:reorder', ids) as Promise<void>,
   scan: () => ipcRenderer.invoke('library:scan') as Promise<{ added: number; updated: number; removed: number; errors: any[] }>,
-
-  // Soundscape bridge — write a rendered loop (WAV bytes) + JSON sidecar to the
-  // shared iCloud "Soundscape Loops" folder.
-  exportLoopToSoundscape: (args: { baseName: string; wav: ArrayBuffer; sidecar: string }) =>
-    ipcRenderer.invoke('bridge:exportLoop', args) as Promise<{ folder: string; filename: string }>,
 
   listScenes: () => ipcRenderer.invoke('scenes:list') as Promise<{ id: number; name: string; createdAt: number; data: string }[]>,
   saveScene: (name: string, data: string) => ipcRenderer.invoke('scenes:save', name, data) as Promise<{ id: number; name: string; createdAt: number; data: string }>,

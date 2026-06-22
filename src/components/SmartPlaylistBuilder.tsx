@@ -1,3 +1,23 @@
+/**
+ * Modal rule builder for Smart Playlists — compose a `FilterOptions`
+ * object via checkboxes/inputs and save it as a smart playlist.
+ *
+ * Where it runs: renderer.
+ * Depends on: shared `FilterOptions` type, the Zustand store, Icon.
+ * Used by:    opened from the Sidebar's "+ Smart Playlist…" menu item
+ *   and by double-clicking an existing smart playlist (edit mode).
+ *
+ * Notes:
+ *  - Smart playlists are saved as JSON in `playlists.auto_query` and
+ *    re-evaluated against `db.listTracks()` every time the playlist is
+ *    viewed — so membership is always current.
+ *  - The fields exposed are intentionally a small subset: rating,
+ *    user-tags-all, finder-tags-all, libraries-any, formats, hasNotes.
+ *    More fields can be added without changing the storage shape — the
+ *    JSON is forward-compatible.
+ *  - `initial` (optional prop) puts the builder into edit mode for an
+ *    existing playlist; without it, the form is empty and creating new.
+ */
 import { useState, useEffect } from 'react';
 import type { FilterOptions } from '@shared/types';
 import { useLibrary } from '../store/library';

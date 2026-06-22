@@ -1,3 +1,23 @@
+/**
+ * Live folder watcher — re-ingest audio files when they're added, modified,
+ * or deleted under any library root.
+ *
+ * Where it runs: main process (Node.js).
+ * Depends on: chokidar (cross-platform fs watcher), ./db.js,
+ *   ./library.js (uses `ingestSingleFile` for new/changed files).
+ * Used by:    main.ts calls `startWatcher` after each library add/remove
+ *   and on app launch. Notifies the renderer with `library:changed`
+ *   whenever something happens so the UI can refresh.
+ *
+ * Notes:
+ *  - One watcher instance covers all library roots at once (chokidar
+ *    can watch many paths). `stopWatcher` tears it down before starting
+ *    a new one — call `startWatcher` again to refresh the set of
+ *    watched paths after the user adds/removes a library.
+ *  - `awaitWriteFinish` (1.5s stability check) prevents us from
+ *    ingesting half-written files when an app is still saving them.
+ *  - Same DAW-folder skip as the scanner — see library.ts.
+ */
 import chokidar, { type FSWatcher } from 'chokidar';
 import path from 'node:path';
 import * as db from './db.js';

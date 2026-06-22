@@ -1,3 +1,29 @@
+/**
+ * Reusable popover primitive — used by the "..." menu, Speed control,
+ * Scenes menu, and anywhere else we want a small floating panel
+ * anchored to a button.
+ *
+ * Where it runs: renderer.
+ * Depends on: React, ReactDOM's createPortal.
+ * Used by:    PlayerBar (multiple), MultiTrackPanel (Scenes menu), and
+ *   anywhere else that calls `usePopover()` + `<Popover>`.
+ *
+ * Notes:
+ *  - Two exports: the `usePopover()` hook (state + position computation
+ *    + close handling) and the `<Popover>` component (renders the
+ *    panel into a React portal so z-index issues are avoided).
+ *  - Closes on three signals: click the trigger again, click outside,
+ *    or Escape. Implemented with a document-level mousedown listener
+ *    that filters by `popoverRef`/`triggerRef.contains(target)`.
+ *  - Position is computed ONCE at open time — `bottom + right` anchor
+ *    relative to the trigger's bounding rect. The portal `style` is
+ *    `position: fixed`, so the popover is positioned in viewport
+ *    coordinates and unaffected by parent transforms.
+ *  - The `.popover-portal` class in `index.css` resets `left: auto`
+ *    because the base `.popover` class sets `left: 0` for the inline
+ *    (non-portal) usage — without the reset, the portal popover
+ *    stretches across the full viewport width. See LEARNED.md.
+ */
 import { useEffect, useRef, useState, useCallback, type ReactNode, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 

@@ -1,10 +1,35 @@
+/**
+ * The "Multi-Track" view — up to 5 audio "tape loops" playing at once.
+ * Each layer is its own full per-track player (own scrubber, loop bar,
+ * speed, reverse, volume, play/pause).
+ *
+ * Where it runs: renderer.
+ * Depends on: the Zustand store (collage slice), Icon, format helpers,
+ *   Popover, the audio engine (read-only — for polling per-track time).
+ * Used by:    rendered by `App.tsx` when the view is `multi-track`.
+ *
+ * Notes:
+ *  - Each card is its own `CollageTrackCard` with its own drag/scrub
+ *    logic — they don't share state with the main player bar. The
+ *    store has dedicated per-index actions: `setCollageVolume(idx, v)`,
+ *    `setCollageLoopRegion(idx, region)`, etc.
+ *  - A low-rate `setInterval` polls each underlying engine player and
+ *    pushes its `currentTime` and `isPlaying` into the store, so each
+ *    card's scrubber stays in sync. (The primary track has a proper
+ *    onTimeUpdate callback; collage tracks don't yet — minor wart.)
+ *  - "Roll the dice" picks N random tracks from the active library
+ *    scope. "Pick a track" opens a modal track picker.
+ *  - "Scenes" save the entire collage (which tracks, each one's
+ *    settings, current positions) as a named JSON blob in the DB.
+ *    Recallable later. The Scenes menu's "Save current as scene…"
+ *    uses an inline name input — replaces a broken `window.prompt()`.
+ */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLibrary } from '../store/library';
 import { Icon } from './Icon';
 import { mediaUrl, formatTime } from '../util/format';
 import { Popover, usePopover } from './Popover';
-import { getEngine } from '../audio/engine';
-import { exportLoopToSoundscape } from '../audio/loopExport';
+import { getEngine } from '../audio/AudioEngine';
 
 export function MultiTrackPanel() {
   const collageTracks = useLibrary((s) => s.collageTracks);
@@ -83,10 +108,7 @@ export function MultiTrackPanel() {
           </button>
           <ScenesMenu
             scenes={scenes}
-            onSave={async () => {
-              const name = prompt('Scene name:');
-              if (name?.trim()) await saveScene(name.trim());
-            }}
+            onSave={saveScene}
             onLoad={loadScene}
             onDelete={deleteScene}
             disabled={collageTracks.length === 0 && scenes.length === 0}
@@ -134,21 +156,6 @@ export function MultiTrackPanel() {
             onLoopRegion={(r) => setCollageLoopRegion(idx, r)}
             onTogglePlay={() => toggleCollagePlay(idx)}
             onSeek={(t) => seekCollage(idx, t)}
-            onExport={async () => {
-              try {
-                const res = await exportLoopToSoundscape({
-                  track: c.track,
-                  mediaUrl: mediaUrl(c.track.path),
-                  loopStart: c.loopActive && c.loopRegion ? c.loopRegion.start : 0,
-                  loopEnd: c.loopActive && c.loopRegion ? c.loopRegion.end : (c.duration || 0),
-                  playbackRate: c.playbackRate,
-                  reversed: c.reversed,
-                });
-                alert(`Sent to Soundscape:\n${res.filename}`);
-              } catch (err: any) {
-                alert(`Export failed: ${err?.message || err}`);
-              }
-            }}
           />
         ))}
       </div>
@@ -195,12 +202,27 @@ function ScenesMenu({
   scenes, onSave, onLoad, onDelete, disabled,
 }: {
   scenes: { id: number; name: string; createdAt: number }[];
-  onSave: () => Promise<void>;
+  /** Takes the scene name string. Naming UI lives inside this menu — the
+   *  parent doesn't need to manage it. */
+  onSave: (name: string) => Promise<void>;
   onLoad: (id: number) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
   disabled: boolean;
 }) {
   const { open, pos, toggle, close, triggerRef, popoverRef } = usePopover();
+  // `naming` toggles the "Save current as scene…" menu row into a small text
+  // input. Enter saves with that name; Esc backs out without leaving the
+  // popover. This replaces a `window.prompt()` call that was silently broken
+  // because Electron disables `prompt()` in BrowserWindows.
+  const [naming, setNaming] = useState(false);
+  const [nameValue, setNameValue] = useState('');
+
+  // If the popover gets closed (outside-click, Esc, retrigger), reset the
+  // input state — otherwise reopening would show stale half-typed text.
+  useEffect(() => {
+    if (!open) { setNaming(false); setNameValue(''); }
+  }, [open]);
+
   return (
     <>
       <button
@@ -213,7 +235,26 @@ function ScenesMenu({
       </button>
       {open && (
         <Popover pos={pos} popoverRef={popoverRef}>
-          <button onClick={async () => { await onSave(); close(); }}>Save current as scene…</button>
+          {naming ? (
+            <input
+              autoFocus
+              className="sidebar-new-playlist"
+              placeholder="Scene name"
+              value={nameValue}
+              onChange={(e) => setNameValue(e.target.value)}
+              onKeyDown={async (e) => {
+                if (e.key === 'Enter' && nameValue.trim()) {
+                  await onSave(nameValue.trim());
+                  close();
+                } else if (e.key === 'Escape') {
+                  setNaming(false);
+                  setNameValue('');
+                }
+              }}
+            />
+          ) : (
+            <button onClick={() => setNaming(true)}>Save current as scene…</button>
+          )}
           <div className="popover-divider" />
           {scenes.length === 0 && <div className="popover-empty">No saved scenes</div>}
           {scenes.map((s) => (
@@ -255,7 +296,6 @@ interface CardProps {
   onLoopRegion: (r: { start: number; end: number } | null) => void;
   onTogglePlay: () => void;
   onSeek: (t: number) => void;
-  onExport: () => void;
 }
 
 function CollageTrackCard(props: CardProps) {
@@ -263,9 +303,8 @@ function CollageTrackCard(props: CardProps) {
     track, volume, playbackRate, reversed, loopRegion, loopActive,
     isPlaying, currentTime, duration, canReverse, canABLoop,
     onRemove, onVolume, onSpeed, onReverse, onLoopActive, onLoopStart, onLoopEnd, onLoopRegion,
-    onTogglePlay, onSeek, onExport,
+    onTogglePlay, onSeek,
   } = props;
-  const [exporting, setExporting] = useState(false);
 
   const scrubberRef = useRef<HTMLDivElement>(null);
 
@@ -457,18 +496,6 @@ function CollageTrackCard(props: CardProps) {
             onChange={(e) => onVolume(Number(e.target.value))}
           />
         </div>
-        <button
-          className={`player-btn-sm ${exporting ? 'on' : ''}`}
-          title="Send this loop to Soundscape"
-          disabled={exporting || !duration}
-          onClick={async (e) => {
-            e.currentTarget.blur();
-            setExporting(true);
-            try { await Promise.resolve(onExport()); } finally { setExporting(false); }
-          }}
-        >
-          <Icon name={exporting ? 'loop' : 'arrow-forward'} size={14} />
-        </button>
       </div>
     </div>
   );

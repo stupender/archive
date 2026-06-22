@@ -1,4 +1,24 @@
-import { spawn } from 'node:child_process';
+/**
+ * Reads macOS Finder color tags from an audio file. macOS-only.
+ *
+ * Where it runs: main process (Node.js).
+ * Depends on: node:child_process (to shell out to `mdls` / `xattr`),
+ *   plist (to parse the binary plist that xattr returns).
+ * Used by:    library.ts during scan, to copy a file's Finder tags into
+ *   the track's `finderTags` array.
+ *
+ * Notes:
+ *  - Finder tags live in an extended attribute called
+ *    `com.apple.metadata:_kMDItemUserTags`. The raw value is a binary
+ *    plist of strings like "Red\n1" (the "\n1" is the color index).
+ *  - Two ways to read them:
+ *      `mdls` — uses Spotlight's index; fast for indexed volumes.
+ *      `xattr` — reads the attribute directly; works on non-indexed
+ *         volumes (external drives, network shares).
+ *    `readTags(path)` tries mdls first, falls back to xattr.
+ *  - Both return an empty array on failure — Archive tolerates "no
+ *    tags" silently.
+ */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import plist from 'plist';

@@ -1,3 +1,25 @@
+/**
+ * "Get Info" — the right-side drawer where the user edits per-track
+ * metadata (title, rating, notes, tags) and sees read-only file details.
+ *
+ * Where it runs: renderer.
+ * Depends on: the Zustand store, Icon, format helpers, shared Track type.
+ * Used by:    opened from the player bar's `<img>` click, from the
+ *   `…` menu's "Get Info" item, and from the track-row right-click menu.
+ *
+ * Notes:
+ *  - The drawer is a CONTROLLED form — local React state holds the edits
+ *    until you click Save, at which point it commits via the store's
+ *    `updateTrackMeta`.
+ *  - Title is editable but writes to the `display_title` column (a
+ *    user-override that survives library re-scans). Empty input clears
+ *    the override and reverts to the file's metadata. See the
+ *    user-override pattern entry in LEARNED.md.
+ *  - Artist and album are READ-ONLY in v0.1. Proper file-metadata
+ *    writing (ID3 / MP4 atoms) is on the v0.2 roadmap.
+ *  - Path tags (folder names) and Finder tags get an "adopt" affordance
+ *    — click any one to copy it into the user-tags list.
+ */
 import { useEffect, useState } from 'react';
 import type { Track } from '@shared/types';
 import { useLibrary } from '../store/library';
@@ -10,19 +32,26 @@ export function TrackDetailDrawer({ track, onClose }: { track: Track; onClose: (
   const revealInFinder = useLibrary((s) => s.revealInFinder);
   const allUserTags = useLibrary((s) => s.userTags);
 
+  const [title, setTitle] = useState(track.title);
   const [rating, setRating] = useState(track.rating);
   const [notes, setNotes] = useState(track.notes);
   const [tags, setTags] = useState<string[]>(track.userTags);
   const [tagInput, setTagInput] = useState('');
 
   useEffect(() => {
+    setTitle(track.title);
     setRating(track.rating);
     setNotes(track.notes);
     setTags(track.userTags);
   }, [track.id]);
 
   const save = async () => {
-    await updateTrackMeta(track.id, { rating, notes, userTags: tags });
+    // Only send the title if it actually changed — skips a pointless write
+    // and avoids a no-op DB row update. Trimming matches the DB's
+    // empty-string-as-clear semantics.
+    const patch: Partial<typeof track> = { rating, notes, userTags: tags };
+    if (title.trim() !== track.title) (patch as any).title = title.trim();
+    await updateTrackMeta(track.id, patch);
     await refreshAll();
     onClose();
   };
@@ -41,7 +70,17 @@ export function TrackDetailDrawer({ track, onClose }: { track: Track; onClose: (
             <div className="drawer-art drawer-art-placeholder"><Icon name="note" size={40} /></div>
           )}
           <div className="drawer-title-block">
-            <h2>{track.title}</h2>
+            {/* The title is editable: click and type. Clearing the field and
+             *  saving reverts to whatever's in the file's metadata. Artist /
+             *  album are read-only in v0.1 — proper file-metadata writing is
+             *  on the v0.2 roadmap. */}
+            <input
+              className="drawer-title-input"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Title"
+              title="Edit the displayed title. Clearing it reverts to the file's metadata."
+            />
             <div className="drawer-artist">{track.artist || 'Unknown artist'}</div>
             {track.album && <div className="drawer-album">{track.album}</div>}
           </div>

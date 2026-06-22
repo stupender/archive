@@ -38,8 +38,8 @@
     "vite-plugin-electron-renderer": "^0.14.6"
   },
   "build": {
-    "appId": "com.sonicarchive.app",
-    "productName": "Sonic Archive",
+    "appId": "com.stupender.archive",
+    "productName": "Archive",
     "mac": {
       "category": "public.app-category.music",
       "target": "dmg"

@@ -1,3 +1,28 @@
+/**
+ * The "Quick Tag" overlay — a Spotlight-style centered dialog for tagging
+ * one or many tracks without leaving your listening flow.
+ *
+ * Where it runs: renderer.
+ * Depends on: the Zustand store (`quickTagTrackIds` state +
+ *   `addTagToTracks` / `removeTagFromTracks` actions), Icon.
+ * Used by:    rendered once at the App level; opened by the `T`
+ *   keyboard shortcut and by the right-click "Tag (T)…" menu item.
+ *
+ * Notes:
+ *  - Opening is driven by the store's `quickTagTrackIds` array. Empty
+ *    array = closed. Setting it to a non-empty array opens the dialog
+ *    pointed at those tracks (bulk tagging).
+ *  - The dialog remembers what had focus when it opened, and restores
+ *    it on close — important for keyboard-driven flow. (You don't lose
+ *    your selection in the track list.)
+ *  - Enter adds the typed tag and clears the input so you can rapid-
+ *    fire multiple tags. Tab autocompletes the top suggestion.
+ *  - For bulk, the "current tags" chips show only tags COMMON to all
+ *    selected tracks (so removing a tag is meaningful for the whole
+ *    selection).
+ *  - Designed to "stay embodied" — single keystroke open, no drawer
+ *    dive, single keystroke close.
+ */
 import { useEffect, useState, useMemo } from 'react';
 import { useLibrary } from '../store/library';
 import { Icon } from './Icon';

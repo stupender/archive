@@ -1,3 +1,22 @@
+/**
+ * Tiny pure-function helpers for formatting things to strings.
+ *
+ * Where it runs: renderer (used by components).
+ * Depends on: nothing.
+ * Used by:    PlayerBar, TrackList, RandomReviewPanel, MultiTrackPanel,
+ *   TrackDetailDrawer — anywhere a duration, file size, or media URL
+ *   needs to be rendered.
+ *
+ * Notes:
+ *  - No React, no state, no side effects — just functions in, strings out.
+ *    Trivial to test if we ever add tests.
+ *  - `mediaUrl(path)` converts a local file path into the `media://`
+ *    URL that the renderer can `fetch()` (the protocol handler is in
+ *    `electron/main.ts`).
+ *  - `formatLabel(format, path)` is the "WAV" / "MP3" / "AIFF" pill
+ *    you see in the track list — prefers the ID3 container name but
+ *    falls back to the file extension if no metadata.
+ */
 export function formatTime(sec: number): string {
   if (!isFinite(sec) || sec < 0) return '0:00';
   const m = Math.floor(sec / 60);

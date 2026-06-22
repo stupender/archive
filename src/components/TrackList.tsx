@@ -1,3 +1,26 @@
+/**
+ * The Songs view — the main list of tracks. Virtualized: only the rows on
+ * screen are rendered, so it stays fast at thousands of tracks.
+ *
+ * Where it runs: renderer.
+ * Depends on: react-window (virtualization), the Zustand store, Icon,
+ *   format helpers, TrackDetailDrawer.
+ * Used by:    rendered by `App.tsx` when the view is "songs," "history,"
+ *   or a playlist.
+ *
+ * Notes:
+ *  - The tracks array is passed in as a prop, not pulled from the store
+ *    directly, so this same component renders any track list (current
+ *    library, a playlist, a smart playlist, etc.).
+ *  - Multi-select: ⌘-click toggles a row in the selection; shift-click
+ *    extends from the last anchor. Plain click replaces. The "Tag (T)"
+ *    keyboard shortcut and the right-click context menu both target
+ *    the multi-selection if any rows are selected.
+ *  - Each row's small play button on the artwork plays the track
+ *    without selecting the row. Double-clicking a row also plays.
+ *  - Hover star rating: stars only show on hover (or for already-rated
+ *    tracks). Click to set; click the same star again to clear.
+ */
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { List, type ListImperativeAPI, type RowComponentProps } from 'react-window';
 import type { Track } from '@shared/types';
@@ -245,7 +268,7 @@ function ArtCell({
 }
 
 function ContextMenu({
-  x, y, track, targetCount, playlists, onClose, onPlay, onInfo, onAddToCollage, onRevealInFinder, onTagSelection, onAddToPlaylist,
+  x, y, targetCount, playlists, onClose, onPlay, onInfo, onAddToCollage, onRevealInFinder, onTagSelection, onAddToPlaylist,
 }: any) {
   const bulk = targetCount > 1;
   // Only manual (non-auto) playlists make sense as add targets.

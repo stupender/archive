@@ -1,3 +1,34 @@
+/**
+ * The persistent bar across the bottom of the window. Shows what's playing,
+ * the transport, the scrubber, the loop bar, and the speed/reverse/volume
+ * cluster.
+ *
+ * Where it runs: renderer.
+ * Depends on: the Zustand store, Icon, format helpers, Popover, the
+ *   TrackDetailDrawer (opens when the user clicks the artwork).
+ * Used by:    rendered once by `App.tsx`.
+ *
+ * Notes:
+ *  - Three zones in the layout:
+ *      LEFT  — artwork (click to Get Info) + title + artist + stars
+ *              + "+ Multi-Track" + "..." menu.
+ *      CENTER — transport (shuffle / prev / play / next / loop),
+ *              scrubber, Start/End loop bar.
+ *      RIGHT  — Reverse + Speed (with up/down arrows + popover slider)
+ *              + Volume.
+ *  - The scrubber's mousedown wires up window-level mousemove/mouseup
+ *    listeners SYNCHRONOUSLY (not via useEffect) so a fast click-drag
+ *    doesn't lose its mouseup to React's render scheduling. This was a
+ *    real bug we hit earlier in development; see LEARNED.md.
+ *  - When a loop is active, the scrubber click target clamps to
+ *    `[loopStart, loopEnd]` — you can't drag the playhead out of the
+ *    loop, but the loop's edges can be moved (and the playhead
+ *    follows them when they cross it).
+ *  - Speed snaps to 1× when within 0.04 of it, so the slider has a
+ *    natural detent at neutral. The detent is also drawn visually.
+ *  - Some big numbers: the speed popover renders fastest at top,
+ *    slowest at bottom, matching the up/down-arrow mental model.
+ */
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useLibrary } from '../store/library';
 import { Icon } from './Icon';
@@ -25,7 +56,8 @@ export function PlayerBar() {
   const setLoopActive = useLibrary((s) => s.setLoopActive);
   const setLoopStart = useLibrary((s) => s.setLoopStart);
   const setLoopEnd = useLibrary((s) => s.setLoopEnd);
-  const setLoopRegion = useLibrary((s) => s.setLoopRegion);
+  // Note: setLoopRegion is read straight from useLibrary.getState() inside the
+  // drag handlers below (synchronous mousedown), not subscribed here.
   const shuffle = useLibrary((s) => s.shuffle);
   const setShuffle = useLibrary((s) => s.setShuffle);
   const jumpToTrackInLibrary = useLibrary((s) => s.jumpToTrackInLibrary);
@@ -146,6 +178,13 @@ export function PlayerBar() {
               <>
                 <div className="player-title-row">
                   <MarqueeText text={currentTrack.title} className="player-title" />
+                  <button
+                    className="player-title-more"
+                    onClick={() => sendCurrentToMultiTrack()}
+                    title={loopActive && loopRegion ? 'Send loop to Multi-Track' : 'Send to Multi-Track'}
+                  >
+                    <Icon name="layers" size={14} />
+                  </button>
                   <TitleMoreMenu />
                 </div>
                 <MarqueeText
@@ -435,7 +474,10 @@ function SpeedReverseCluster({
 
       {open && (
         <Popover pos={pos} popoverRef={popoverRef}>
-          {SPEED_STEPS.map((r) => (
+          {/* Render fastest at top, slowest at bottom — matches the "slider
+           *  going up = faster" mental model, and matches the up/down
+           *  arrows next to the speed button. */}
+          {[...SPEED_STEPS].reverse().map((r) => (
             <button
               key={r}
               className={r === playbackRate ? 'active' : ''}

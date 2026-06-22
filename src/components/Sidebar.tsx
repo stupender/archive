@@ -1,3 +1,28 @@
+/**
+ * The left rail: Libraries (multi-select toggles, drag-to-reorder),
+ * Library browse modes (Songs / Random Review / Multi-Track / History),
+ * Playlists (manual + smart), Tags, Finder Tags.
+ *
+ * Where it runs: renderer.
+ * Depends on: the Zustand store, SmartPlaylistBuilder, Icon.
+ * Used by:    rendered once by `App.tsx`.
+ *
+ * Notes:
+ *  - "Libraries" rows are TOGGLES, not navigation — clicking one filters
+ *    every other view to that library. ⌘-click toggles multi-select.
+ *    Empty selection = "all libraries."
+ *  - Drag-to-reorder uses native HTML5 drag-and-drop. The blue line
+ *    that appears between rows during a drag is the `drop-above` /
+ *    `drop-below` indicator in `index.css`.
+ *  - Tag rows in the lower sections work the same way: clicking a tag
+ *    toggles it into the global tag filter (AND-combined with the
+ *    current view). The active filters also show as chips in the
+ *    Topbar with × to clear.
+ *  - The "+" beside Playlists opens a tiny inline menu choosing
+ *    between Playlist (manual) and Smart Playlist (rule builder).
+ *    Smart playlists render with a dice icon; double-click to edit
+ *    their rules in the SmartPlaylistBuilder modal.
+ */
 import { useState } from 'react';
 import { useLibrary } from '../store/library';
 import type { View } from '../store/library';
@@ -13,7 +38,6 @@ export function Sidebar() {
   const finderTags = useLibrary((s) => s.finderTags);
   const libraries = useLibrary((s) => s.libraries);
   const activeLibraryIds = useLibrary((s) => s.activeLibraryIds);
-  const setActiveLibraryIds = useLibrary((s) => s.setActiveLibraryIds);
   const toggleLibrary = useLibrary((s) => s.toggleLibrary);
   const addLibrary = useLibrary((s) => s.addLibrary);
   const deleteLibrary = useLibrary((s) => s.deleteLibrary);
@@ -51,24 +75,22 @@ export function Sidebar() {
           </button>
         </div>
 
-        <button
-          type="button"
-          className={`sidebar-toggle ${activeLibraryIds.length === 0 ? 'on' : ''}`}
-          onClick={() => setActiveLibraryIds([])}
-          title="Show all libraries"
-        >
-          <span className="sidebar-toggle-check">
-            {activeLibraryIds.length === 0 && <Icon name="check" size={11} />}
-          </span>
-          <span className="sidebar-toggle-label">All Libraries</span>
-        </button>
-
         {libraries.map((lib) => {
           const on = activeLibraryIds.includes(lib.id);
+          // Compute which side of the target the drop line should appear on.
+          // The splice logic inserts BEFORE the target when dragging up the
+          // list and AFTER the target when dragging down, so the visual line
+          // matches that real behavior.
+          let dropClass = '';
+          if (dragOverId === lib.id && dragId != null && dragId !== lib.id) {
+            const dragIdx = libraries.findIndex((l) => l.id === dragId);
+            const targetIdx = libraries.findIndex((l) => l.id === lib.id);
+            dropClass = targetIdx < dragIdx ? 'drop-above' : 'drop-below';
+          }
           return (
             <div
               key={lib.id}
-              className={`sidebar-toggle ${on ? 'on' : ''} ${dragOverId === lib.id ? 'drop-target' : ''} ${dragId === lib.id ? 'dragging' : ''}`}
+              className={`sidebar-toggle ${on ? 'on' : ''} ${dropClass} ${dragId === lib.id ? 'dragging' : ''}`}
               draggable={renaming !== lib.id}
               onDragStart={(e) => {
                 setDragId(lib.id);

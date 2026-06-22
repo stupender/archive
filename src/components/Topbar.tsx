@@ -1,3 +1,22 @@
+/**
+ * The strip across the top of the main pane: the page heading, the
+ * track count, the search field, the sort selector, the rescan
+ * button, and any active tag-filter chips.
+ *
+ * Where it runs: renderer.
+ * Depends on: the Zustand store, Icon.
+ * Used by:    rendered once inside `App.tsx`'s `.main` column.
+ *
+ * Notes:
+ *  - The heading is computed from the current view kind plus the
+ *    active library selection. "All Songs" when no libraries are
+ *    selected, the library name when one is, "N libraries" when many.
+ *  - Search / sort / rescan / filter chips only appear in views where
+ *    they make sense (i.e. they hide on Random Review and Multi-Track).
+ *  - The Topbar is also the drag region for the macOS window — the
+ *    whole bar is `-webkit-app-region: drag` in the CSS, with the
+ *    interactive children explicitly opted out.
+ */
 import { useLibrary } from '../store/library';
 import { Icon } from './Icon';
 
@@ -31,8 +50,6 @@ export function Topbar() {
       case 'history': return 'Listening History';
       case 'random-review': return 'Random Review';
       case 'multi-track': return 'Multi-Track Collage';
-      case 'userTag':   return `Tag: ${view.tag}`;
-      case 'finderTag': return `Finder Tag: ${view.tag}`;
       case 'playlist':  return view.name;
     }
   })();

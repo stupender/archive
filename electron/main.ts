@@ -1,3 +1,22 @@
+/**
+ * Entry point of the Electron MAIN process — the Node.js side of the app.
+ *
+ * Where it runs: main process (Node.js, has full OS access).
+ * Depends on: electron APIs, our DB layer (`./db.js`), library scanner
+ *   (`./library.js`), file watcher (`./watcher.js`), shared types.
+ * Used by:    nothing imports this file — it IS the entry point that
+ *   electron-builder packages and macOS launches.
+ *
+ * Notes:
+ *  - Every `ipcMain.handle('namespace:action', ...)` below is a function the
+ *    renderer can call through `window.sonic.<thing>` (see preload.ts).
+ *  - Registers a custom `media://` protocol so the renderer can fetch local
+ *    audio files (Chromium would otherwise block file:// reads).
+ *  - Calls `app.setName('sonic-archive')` BEFORE anything reads the userData
+ *    path, so renaming the user-facing product to "Archive" doesn't move
+ *    where the DB lives.
+ *  - Creates exactly one BrowserWindow on launch and on macOS "activate."
+ */
 import { app, BrowserWindow, ipcMain, dialog, protocol, net, shell } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -9,17 +28,16 @@ import type { FilterOptions, SortOption } from '../shared/types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Lock the internal app name BEFORE anything reads the userData path. Electron
+// derives the userData folder from `app.getName()`, which defaults to the
+// `name` field in package.json. We want the user-visible product to be called
+// "Archive" (set via `productName`), but the on-disk data folder must keep
+// being "sonic-archive" so existing libraries, ratings, tags, scenes, and
+// history survive the rename. This one line decouples the two.
+app.setName('sonic-archive');
+
 let mainWindow: BrowserWindow | null = null;
 let artworkDir = '';
-
-/** Shared drop folder for loops handed to Soundscape. Prefers iCloud Drive so
- *  it syncs to the iPad/iPhone; falls back to ~/Soundscape Loops. */
-function soundscapeLoopsFolder(): string {
-  const home = app.getPath('home');
-  const icloud = path.join(home, 'Library/Mobile Documents/com~apple~CloudDocs');
-  const base = fs.existsSync(icloud) ? icloud : home;
-  return path.join(base, 'Soundscape Loops');
-}
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -125,20 +143,6 @@ app.whenReady().then(async () => {
   ipcMain.handle('scenes:list', () => db.listScenes());
   ipcMain.handle('scenes:save', (_e, name: string, data: string) => db.saveScene(name, data));
   ipcMain.handle('scenes:delete', (_e, id: number) => db.deleteScene(id));
-
-  // --- Soundscape bridge: write a rendered loop + sidecar to the shared
-  //     iCloud "Soundscape Loops" folder (see Soundscape Docs/BRIDGE.md). The
-  //     renderer hands us the already-encoded WAV bytes and the sidecar JSON.
-  ipcMain.handle('bridge:exportLoop', async (_e, args: { baseName: string; wav: ArrayBuffer; sidecar: string }) => {
-    const folder = soundscapeLoopsFolder();
-    fs.mkdirSync(folder, { recursive: true });
-    const safeBase = args.baseName.replace(/[/\\:]/g, '-').slice(0, 80) || 'Loop';
-    let base = safeBase, i = 1;
-    while (fs.existsSync(path.join(folder, base + '.wav'))) { base = `${safeBase}-${i++}`; }
-    fs.writeFileSync(path.join(folder, base + '.wav'), Buffer.from(args.wav));
-    fs.writeFileSync(path.join(folder, base + '.json'), args.sidecar, 'utf8');
-    return { folder, filename: base + '.wav' };
-  });
 
   ipcMain.handle('library:scan', async () => {
     const onProgress = (done: number, total: number, current: string) => {

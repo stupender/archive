@@ -1,4 +1,19 @@
 /**
+ * Inline SVG icon set — ~35 named icons used throughout the UI.
+ *
+ * Where it runs: renderer.
+ * Depends on: nothing (pure JSX, no external icon library).
+ * Used by:    every component that draws an icon.
+ *
+ * Notes:
+ *  - Each icon is a tiny inline SVG that inherits `currentColor`, so
+ *    coloring is done with normal CSS `color` on the parent.
+ *  - Replacing this with a third-party icon set later would be a
+ *    drop-in swap because every caller uses `<Icon name="play" />` —
+ *    no caller knows about the SVG internals.
+ *  - SF Symbols–inspired: stroke-based, light Apple-style weight.
+ */
+/**
  * SF Symbols–inspired icon set, rendered inline so they inherit currentColor
  * and stay crisp at any size. Stroke-based for the lighter Apple feel.
  */

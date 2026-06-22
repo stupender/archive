@@ -1,3 +1,13 @@
+/**
+ * Tiny notification banner at the bottom of the screen — auto-dismisses
+ * after 6 seconds, or click to dismiss.
+ *
+ * Where it runs: renderer.
+ * Depends on: the Zustand store (`toast` state + `setToast` action).
+ * Used by:    `App.tsx` renders one of these globally. Any code path
+ *   (a store action, a component) can summon a toast by calling
+ *   `setToast({ kind: 'info' | 'error', message })`.
+ */
 import { useEffect } from 'react';
 import { useLibrary } from '../store/library';
 

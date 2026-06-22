@@ -1,3 +1,28 @@
+/**
+ * SQLite-backed persistence for Archive. All DB queries live in this file.
+ *
+ * Where it runs: main process (Node.js).
+ * Depends on: better-sqlite3 (native module, rebuilt against Electron by
+ *   the `electron-rebuild` postinstall), shared types.
+ * Used by:    main.ts's IPC handlers; library.ts's scanner; watcher.ts.
+ *
+ * Notes:
+ *  - `initDB(userDataPath)` is called once on app start. It creates the
+ *    database file at `<userData>/library.db`, defines the schema with
+ *    `CREATE TABLE IF NOT EXISTS …`, then runs lightweight migrations
+ *    via the `migrate()` helper.
+ *  - "Migration" here just means: check if a column exists with
+ *    `colExists(table, col)`, and if not, `ALTER TABLE … ADD COLUMN`.
+ *    Cheap and good enough for a single-user local app. Don't reach for
+ *    a full migration framework unless the schema gets significantly
+ *    more complex.
+ *  - Each table has a `rowToXxx(row)` helper that converts the raw
+ *    SQLite row (snake_case columns) into the shared TypeScript type
+ *    (camelCase fields). JSON-encoded array columns (tags, etc.) are
+ *    parsed here.
+ *  - `display_title` is a "user override" column — see LEARNED.md's
+ *    "user-override pattern" entry.
+ */
 import Database from 'better-sqlite3';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -132,6 +157,13 @@ function migrate() {
   if (!colExists('tracks', 'decode_failed')) {
     db.exec(`ALTER TABLE tracks ADD COLUMN decode_failed INTEGER NOT NULL DEFAULT 0`);
   }
+  if (!colExists('tracks', 'display_title')) {
+    // User override for the displayed title. Null = no override; fall back
+    // to the `title` column (which came from the file's metadata). Survives
+    // library re-scans because upsertTrack only writes the `title` column,
+    // not this one. See LEARNED.md "user-override pattern."
+    db.exec(`ALTER TABLE tracks ADD COLUMN display_title TEXT`);
+  }
 
   // First-time migration: if libraries table is empty but we have a legacy
   // rootFolders setting, seed libraries from it.
@@ -154,11 +186,6 @@ function migrate() {
       } catch {}
     }
   }
-}
-
-export function getDB() {
-  if (!db) throw new Error('DB not initialized');
-  return db;
 }
 
 // === Libraries =============================================================
@@ -195,18 +222,6 @@ export function renameLibrary(id: number, name: string) {
   db.prepare('UPDATE libraries SET name = ? WHERE id = ?').run(name, id);
 }
 
-export function findLibraryForPath(p: string): Library | null {
-  const libs = listLibraries();
-  // Pick the longest matching prefix so a nested library wins over a parent.
-  let best: Library | null = null;
-  for (const l of libs) {
-    if (p.startsWith(l.path + path.sep) || p === l.path) {
-      if (!best || l.path.length > best.path.length) best = l;
-    }
-  }
-  return best;
-}
-
 // === Tracks ================================================================
 
 function rowToTrack(row: any): Track {
@@ -214,7 +229,9 @@ function rowToTrack(row: any): Track {
     id: row.id,
     libraryId: row.library_id,
     path: row.path,
-    title: row.title,
+    // If the user has edited the title in Get Info, that override wins;
+    // otherwise we show the title that came from the file's metadata.
+    title: row.display_title ?? row.title,
     artist: row.artist,
     album: row.album,
     genre: row.genre,
@@ -308,18 +325,6 @@ export function listTracks(filter: FilterOptions = {}, sort: SortOption = { fiel
     where.push('(genre = ? OR user_tags LIKE ?)');
     params.push(filter.genre, `%"${filter.genre}"%`);
   }
-  if (filter.finderTag) {
-    where.push('finder_tags LIKE ?');
-    params.push(`%"${filter.finderTag}"%`);
-  }
-  if (filter.userTag) {
-    where.push('user_tags LIKE ?');
-    params.push(`%"${filter.userTag}"%`);
-  }
-  if (filter.pathTag) {
-    where.push('path_tags LIKE ?');
-    params.push(`%"${filter.pathTag}"%`);
-  }
   if (filter.userTagsAll) {
     for (const tag of filter.userTagsAll) {
       where.push('user_tags LIKE ?');
@@ -398,13 +403,20 @@ export function getRandomTracks(n: number, filter: FilterOptions = {}): Track[] 
 
 export function updateTrackUserMeta(
   id: number,
-  patch: Partial<Pick<Track, 'rating' | 'notes' | 'userTags'>>,
+  patch: Partial<Pick<Track, 'rating' | 'notes' | 'userTags' | 'title'>>,
 ) {
   const fields: string[] = [];
   const params: any[] = [];
   if (patch.rating !== undefined) { fields.push('rating = ?'); params.push(patch.rating); }
   if (patch.notes !== undefined) { fields.push('notes = ?'); params.push(patch.notes); }
   if (patch.userTags !== undefined) { fields.push('user_tags = ?'); params.push(JSON.stringify(patch.userTags)); }
+  if (patch.title !== undefined) {
+    // Title edits write to display_title (the user-override column), NOT the
+    // canonical `title` column. Empty string means "clear the override and
+    // revert to whatever's in the file's metadata."
+    fields.push('display_title = ?');
+    params.push(patch.title.trim() === '' ? null : patch.title);
+  }
   if (fields.length === 0) return;
   params.push(id);
   db.prepare(`UPDATE tracks SET ${fields.join(', ')} WHERE id = ?`).run(...params);

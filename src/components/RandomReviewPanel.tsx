@@ -1,3 +1,28 @@
+/**
+ * The "Random Review" view — Eno's archive-surfacing tool. Pick whole
+ * tracks or short random slices, build a history queue, jump back and
+ * forth through it.
+ *
+ * Where it runs: renderer.
+ * Depends on: the Zustand store, Icon, format helpers.
+ * Used by:    rendered by `App.tsx` when the view is `random-review`.
+ *
+ * Notes:
+ *  - The slice length is one of `1, 2, 3, 5, 10, 20, 30, 60` seconds,
+ *    or `whole`. The actual auto-advance logic is in the store
+ *    (`pickRandom` schedules a callback via `onTimeUpdate` that picks
+ *    another random track when the slice's end is reached).
+ *  - Random picks APPEND to the queue (capped at 200). Prev/Next on
+ *    the player bar (or here) walks that queue — so "go back, I liked
+ *    that one" works.
+ *  - The library scope follows the sidebar — `activeLibraryIds`
+ *    determines what pool the random picker draws from. The explainer
+ *    paragraph at the top names the scope so you always know what
+ *    you're rolling from.
+ *  - The "Add to playlist…" popover contains an inline "+ New playlist"
+ *    name input — that replaced a broken `window.prompt()` call. See
+ *    LEARNED.md about Electron disabling prompt().
+ */
 import { useEffect, useState } from 'react';
 import { useLibrary } from '../store/library';
 import type { SliceLength } from '@shared/types';
@@ -26,6 +51,16 @@ export function RandomReviewPanel() {
 
   const [history, setHistory] = useState<any[]>([]);
   const [showAddTo, setShowAddTo] = useState(false);
+  // Inline name input for "+ New playlist" inside the Add-to-playlist popover.
+  // Replaces a `window.prompt()` call that was silently broken because
+  // Electron disables `prompt()` in BrowserWindows.
+  const [creatingPlaylist, setCreatingPlaylist] = useState(false);
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+
+  // Reset the inline-input state whenever the popover closes.
+  useEffect(() => {
+    if (!showAddTo) { setCreatingPlaylist(false); setNewPlaylistName(''); }
+  }, [showAddTo]);
 
   useEffect(() => {
     window.sonic.getRecentHistory(50).then(setHistory);
@@ -119,7 +154,12 @@ export function RandomReviewPanel() {
                 Add to playlist…
               </button>
               {showAddTo && (
-                <div className="popover" onMouseLeave={() => setShowAddTo(false)}>
+                <div
+                  className="popover"
+                  // Don't auto-close while the user is mid-typing a playlist name —
+                  // the mouseleave-close pattern would otherwise kill the input.
+                  onMouseLeave={() => { if (!creatingPlaylist) setShowAddTo(false); }}
+                >
                   {playlists.length === 0 && <div className="popover-empty">No playlists yet</div>}
                   {playlists.map((p) => (
                     <button key={p.id} onClick={async () => {
@@ -130,19 +170,34 @@ export function RandomReviewPanel() {
                     </button>
                   ))}
                   <div className="popover-divider" />
-                  <button onClick={async () => {
-                    const name = prompt('New playlist name:');
-                    if (name?.trim()) {
-                      await createPlaylist(name.trim());
-                      // Find it back to add this track
-                      const updated = await window.sonic.listPlaylists();
-                      const created = updated.find((p: any) => p.name === name.trim());
-                      if (created) await addToPlaylist(created.id, currentTrack.id);
-                    }
-                    setShowAddTo(false);
-                  }}>
-                    + New playlist
-                  </button>
+                  {creatingPlaylist ? (
+                    <input
+                      autoFocus
+                      className="sidebar-new-playlist"
+                      placeholder="Playlist name"
+                      value={newPlaylistName}
+                      onChange={(e) => setNewPlaylistName(e.target.value)}
+                      onKeyDown={async (e) => {
+                        if (e.key === 'Enter' && newPlaylistName.trim()) {
+                          const name = newPlaylistName.trim();
+                          await createPlaylist(name);
+                          // The store doesn't return the new id, so we fetch
+                          // the list back and look it up by name.
+                          const updated = await window.sonic.listPlaylists();
+                          const created = updated.find((p: any) => p.name === name);
+                          if (created) await addToPlaylist(created.id, currentTrack.id);
+                          setShowAddTo(false);
+                        } else if (e.key === 'Escape') {
+                          setCreatingPlaylist(false);
+                          setNewPlaylistName('');
+                        }
+                      }}
+                    />
+                  ) : (
+                    <button onClick={() => setCreatingPlaylist(true)}>
+                      + New playlist
+                    </button>
+                  )}
                 </div>
               )}
             </div>

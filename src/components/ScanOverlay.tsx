@@ -1,3 +1,18 @@
+/**
+ * Full-screen overlay shown while a folder scan runs — progress bar +
+ * counter + currently-being-processed file path.
+ *
+ * Where it runs: renderer.
+ * Depends on: the Zustand store (reads `scanProgress`, which the main
+ *   process pushes via the `library:scanProgress` event).
+ * Used by:    `App.tsx` renders this on top of everything when
+ *   `state.scanning` is true.
+ *
+ * Notes:
+ *  - Scan progress messages are sent every 5 files from `library.ts`'s
+ *    `scanAllLibraries` (throttled to avoid flooding the IPC channel
+ *    on large libraries).
+ */
 import { useLibrary } from '../store/library';
 
 export function ScanOverlay() {
