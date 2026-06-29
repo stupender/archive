@@ -28,6 +28,7 @@
  */
 
 import type { ITrackPlayer, PlayerCapabilities, TrackPlayerOptions } from './TrackPlayer';
+import { PermissionDeniedError } from './AudioEngine';
 
 /** Compute the source's actual playhead position given its start offset,
  *  the audio time elapsed since it started, and the loop bounds.
@@ -109,6 +110,18 @@ export class BufferTrackPlayer implements ITrackPlayer {
       res = await fetch(this.url);
     } catch (err: any) {
       throw new Error(`Couldn't fetch file: ${err?.message || err}`);
+    }
+    if (res.status === 403) {
+      // The media:// protocol handler in main.ts returns 403 with a JSON
+      // body when macOS TCC denies file access (typically for external
+      // drives on unsigned builds). Surface this as a typed error so the
+      // store can show the Permissions banner instead of a generic toast.
+      let path: string | undefined;
+      try {
+        const body = await res.json();
+        if (body?.kind === 'permission-denied') path = body.path;
+      } catch {}
+      throw new PermissionDeniedError(path);
     }
     if (!res.ok) throw new Error(`Couldn't fetch file (status ${res.status})`);
     const arr = await res.arrayBuffer();

@@ -22,6 +22,19 @@ The build is unsigned, so on first launch macOS will say "Archive can't
 be opened because it is from an unidentified developer." Right-click the
 app and choose "Open" to bypass this once.
 
+### First-launch permissions (for libraries on external drives)
+
+Because the v0.1 build isn't code-signed, macOS won't let Archive read
+files on external drives (or in `~/Documents`, `~/Desktop`, `~/Downloads`)
+without an explicit grant. If you click Play on a track and nothing
+happens, Archive will show a yellow banner explaining this with an
+"Open System Settings" button. From the **Privacy & Security → Full
+Disk Access** pane, find Archive in the list (or click `+` and add
+`/Applications/Archive.app`) and turn it on. Quit and relaunch.
+
+This won't be necessary in a future version once the build is code-signed
+and notarized.
+
 ## What it does
 
 - **Add folders as "libraries."** Archive scans them recursively, reads

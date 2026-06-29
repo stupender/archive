@@ -31,6 +31,18 @@ import type { ITrackPlayer, TrackPlayerOptions } from './TrackPlayer';
 import { BufferTrackPlayer } from './BufferTrackPlayer';
 import { MediaTrackPlayer } from './MediaTrackPlayer';
 
+/** Thrown when the macOS TCC system denies file access — typically for
+ *  external drives on unsigned builds. The store catches this and shows
+ *  the Permissions banner with a deeplink to the right Settings pane. */
+export class PermissionDeniedError extends Error {
+  readonly path?: string;
+  constructor(path?: string) {
+    super('macOS denied file access');
+    this.name = 'PermissionDeniedError';
+    this.path = path;
+  }
+}
+
 /** Try the buffer backend first; on decode failure, fall back to media-element. */
 export async function makeTrackPlayer(opts: TrackPlayerOptions): Promise<ITrackPlayer> {
   const buf = new BufferTrackPlayer(opts);
@@ -39,6 +51,9 @@ export async function makeTrackPlayer(opts: TrackPlayerOptions): Promise<ITrackP
     return buf;
   } catch (err: any) {
     buf.destroy();
+    // Don't try MediaTrackPlayer for permission errors — the OS would deny
+    // it for the same reason. Let the store handle it via the banner.
+    if (err instanceof PermissionDeniedError) throw err;
     // Fall through to MediaElement only if it's a decode/format issue, not a
     // network/filesystem issue.
     const msg = String(err?.message || err);

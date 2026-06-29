@@ -72,6 +72,11 @@ const api = {
   getSetting: (k: string) => ipcRenderer.invoke('settings:get', k) as Promise<string | null>,
   setSetting: (k: string, v: string) => ipcRenderer.invoke('settings:set', k, v) as Promise<void>,
 
+  // System integration — deeplink to the macOS Privacy & Security pane where
+  // the user can grant Archive Full Disk Access (needed for external drives
+  // on unsigned builds).
+  openPrivacySettings: () => ipcRenderer.invoke('system:openPrivacySettings') as Promise<void>,
+
   // Events
   onLibraryChanged: (cb: () => void) => {
     const handler = () => cb();

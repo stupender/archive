@@ -22,7 +22,7 @@
 import type { StoreApi } from 'zustand';
 import type { FilterOptions } from '@shared/types';
 import type { State } from '../library';
-import { getEngine, LoadSupersededError } from '../../audio/AudioEngine';
+import { getEngine, LoadSupersededError, PermissionDeniedError } from '../../audio/AudioEngine';
 
 type Set = StoreApi<State>['setState'];
 type Get = StoreApi<State>['getState'];
@@ -122,6 +122,10 @@ export function createRandomSlice(set: Set, get: Get): RandomSlice {
         });
       } catch (err: any) {
         if (err instanceof LoadSupersededError) return;
+        if (err instanceof PermissionDeniedError) {
+          get().openPermissionsBanner(err.path ?? null);
+          return;
+        }
         console.error('pickRandom failed:', err);
         // If decode failed, mark and try another
         if (String(err?.message || '').includes("isn't a decodable")) {

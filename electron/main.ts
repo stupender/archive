@@ -88,16 +88,37 @@ async function createWindow() {
 }
 
 app.whenReady().then(async () => {
-  protocol.handle('media', (request) => {
+  protocol.handle('media', async (request) => {
+    let filePath = '';
     try {
       const u = new URL(request.url);
       const rel = u.pathname.replace(/^\/+/, '');
-      const filePath = '/' + decodeURIComponent(rel);
-      return net.fetch(pathToFileURL(filePath).toString());
+      filePath = '/' + decodeURIComponent(rel);
     } catch (err) {
-      console.error('[media://] fetch failed for', request.url, err);
+      console.error('[media://] bad URL', request.url, err);
+      return new Response('', { status: 400 });
+    }
+
+    // Probe the file with a node fs call first so we can distinguish a real
+    // "file gone" from a "macOS TCC denied access" — net.fetch() lumps both
+    // into a generic failure. If we get EACCES/EPERM, the renderer needs to
+    // show the Permissions banner rather than a vague toast.
+    try {
+      fs.accessSync(filePath, fs.constants.R_OK);
+    } catch (err: any) {
+      const code = err?.code;
+      if (code === 'EACCES' || code === 'EPERM') {
+        console.error('[media://] permission denied for', filePath);
+        return new Response(
+          JSON.stringify({ kind: 'permission-denied', path: filePath }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      console.error('[media://] file not accessible:', filePath, code);
       return new Response('', { status: 404 });
     }
+
+    return net.fetch(pathToFileURL(filePath).toString());
   });
 
   const userData = app.getPath('userData');
@@ -220,6 +241,14 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('settings:get', (_e, k: string) => db.getSetting(k));
   ipcMain.handle('settings:set', (_e, k: string, v: string) => db.setSetting(k, v));
+
+  // === System integration ==================================================
+  // Deeplink to System Settings → Privacy & Security → Full Disk Access so
+  // the user can grant Archive permission to read external/protected drives
+  // in one click instead of hunting through Settings.
+  ipcMain.handle('system:openPrivacySettings', () => {
+    shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles');
+  });
 
   await createWindow();
   startWatcher(artworkDir, notifyLibraryChange);

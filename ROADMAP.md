@@ -9,6 +9,20 @@ commitment; it is a memory.
 
 ---
 
+## v0.1.1 — first polish patch (after shipping v0.1.0)
+
+- **App icon.** Real artwork in `.icns` format so the Dock, About panel,
+  Finder, and the `.dmg` mount window all show a proper Archive icon
+  instead of Electron's default. Needs source SVG/PNG at 1024×1024 then
+  multiple sizes baked into the icns. Electron-builder picks it up from
+  `build.icon` in package.json.
+- **Code-signing + notarization.** Unsigned `.dmg` triggers Gatekeeper's
+  "from an unidentified developer" warning on every first-launch
+  machine, and constrains the app's macOS permissions. Requires an
+  Apple Developer account ($99/yr). Once in place: signed `.app`,
+  notarized `.dmg`, no scary warning, full file-access permission flow.
+- **README screenshots.** If v0.1.0 ships without them; add 3–4 PNGs.
+
 ## v0.2 — the UX unification (the next focused release)
 
 The shared insight: the playback bar can be thought of as a single

@@ -1709,6 +1709,80 @@ input[type="range"]::-webkit-slider-thumb {
   justify-content: center;
 }
 
+/* === Permissions banner ==================================================
+ * Persistent (no auto-dismiss) banner shown when macOS TCC denies file
+ * access. Center-screen, with two action buttons. Yellow-tinted to read
+ * as a warning, not an error.
+ * ========================================================================= */
+.permissions-banner {
+  position: fixed;
+  bottom: calc(var(--player-h) + 16px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2a2415;
+  border: 1px solid #5e4d1f;
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  font-size: 13px;
+  color: var(--text);
+  box-shadow: var(--shadow-card);
+  z-index: 250;
+  max-width: 640px;
+  width: calc(100% - 48px);
+}
+.permissions-banner-icon {
+  color: #e7b94f;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 1px;
+}
+.permissions-banner-body { flex: 1; min-width: 0; }
+.permissions-banner-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #f4d77a;
+}
+.permissions-banner-message {
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+.permissions-banner-path {
+  font-family: var(--mono, ui-monospace, "SF Mono", Menlo, monospace);
+  font-size: 11px;
+  color: var(--text-tertiary, #7a7a80);
+  margin-top: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.permissions-banner-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.permissions-banner-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.permissions-banner-btn:hover { background: rgba(255,255,255,0.05); }
+.permissions-banner-btn.primary {
+  background: #5e4d1f;
+  border-color: #806c2f;
+}
+.permissions-banner-btn.primary:hover { background: #6e5b27; }
+
 /* === Star button (used in track row + random review) ====================== */
 
 .star {

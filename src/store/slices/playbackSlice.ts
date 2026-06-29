@@ -28,7 +28,7 @@
 
 import type { StoreApi } from 'zustand';
 import type { State, CollageTrackState } from '../library';
-import { getEngine, LoadSupersededError } from '../../audio/AudioEngine';
+import { getEngine, LoadSupersededError, PermissionDeniedError } from '../../audio/AudioEngine';
 
 type Set = StoreApi<State>['setState'];
 type Get = StoreApi<State>['getState'];
@@ -146,6 +146,13 @@ export function createPlaybackSlice(set: Set, get: Get): PlaybackSlice {
         });
       } catch (err: any) {
         if (err instanceof LoadSupersededError) return; // silently
+        if (err instanceof PermissionDeniedError) {
+          // macOS TCC denied access — usually external drive on an
+          // unsigned build. Open the persistent banner instead of a toast
+          // since the user has to take action (System Settings) to fix.
+          get().openPermissionsBanner(err.path ?? t.path);
+          return;
+        }
         console.error('playTrack failed:', err);
         set({ toast: { kind: 'error', message: `Couldn't play "${t.title}": ${err?.message || err}` } });
         // Mark un-decodable so we don't keep tripping on it

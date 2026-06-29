@@ -42,7 +42,14 @@
     "productName": "Archive",
     "mac": {
       "category": "public.app-category.music",
-      "target": "dmg"
+      "target": "dmg",
+      "extendInfo": {
+        "NSDocumentsFolderUsageDescription": "Archive needs to read audio files in your Documents folder.",
+        "NSDesktopFolderUsageDescription": "Archive needs to read audio files on your Desktop.",
+        "NSDownloadsFolderUsageDescription": "Archive needs to read audio files in your Downloads folder.",
+        "NSRemovableVolumesUsageDescription": "Archive needs to access audio files on external drives and USB devices.",
+        "NSNetworkVolumesUsageDescription": "Archive needs to access audio files on network volumes."
+      }
     },
     "files": [
       "dist/**/*",

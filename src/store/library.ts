@@ -150,10 +150,22 @@ export interface State {
   // Toast (inlined below)
   toast: { kind: 'error' | 'info'; message: string } | null;
 
+  /** Permissions banner — shown when macOS TCC blocks file access (typically
+   *  for external drives on unsigned builds). `path` is the file we failed to
+   *  read, used in the banner copy so the user knows what's affected. */
+  permissionsBanner: { open: boolean; path: string | null };
+
   // ---- Actions ----
 
   // Toast
   setToast: (t: State['toast']) => void;
+
+  // Permissions banner
+  openPermissionsBanner: (path: string | null) => void;
+  closePermissionsBanner: () => void;
+  /** Calls into `window.sonic.openPrivacySettings` — deeplinks to System
+   *  Settings → Privacy & Security → Full Disk Access. */
+  openSystemPrivacySettings: () => Promise<void>;
 
   // Libraries (librariesSlice)
   init: () => Promise<void>;
@@ -260,4 +272,12 @@ export const useLibrary = create<State>((set, get) => ({
   // Toast — too small to justify its own slice file.
   toast: null,
   setToast: (toast) => set({ toast }),
+
+  // Permissions banner — also small, also inlined.
+  permissionsBanner: { open: false, path: null },
+  openPermissionsBanner: (path) => set({ permissionsBanner: { open: true, path } }),
+  closePermissionsBanner: () => set({ permissionsBanner: { open: false, path: null } }),
+  openSystemPrivacySettings: async () => {
+    await (window as any).sonic.openPrivacySettings();
+  },
 }));

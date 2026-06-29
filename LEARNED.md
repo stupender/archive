@@ -212,3 +212,19 @@ The format is:
 > (2) the slice files only need `State` as a *type* (`import type`),
 > which is erased at compile time. TS handles the circle without
 > complaint as long as the type-only imports stay type-only.
+
+> **macOS TCC (Transparency, Consent, Control) blocks file access for
+> unsigned apps.** When Archive runs as a .dmg-installed .app, macOS
+> treats it as a separate identity from the Terminal that runs the dev
+> server. External drives, Documents, Desktop, Downloads, and Music
+> folders are all gated. The classic symptom: dev mode plays fine, .app
+> just hangs on play. The fix path: (1) declare usage descriptions in
+> Info.plist via electron-builder's `mac.extendInfo` so macOS shows a
+> readable prompt instead of silently denying; (2) detect EACCES/EPERM
+> in the protocol handler and return a 403 so the renderer can react;
+> (3) show a persistent banner with a deeplink to the right Settings
+> pane (`x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles`).
+> The real fix is code-signing + notarization (v0.1.1); usage strings
+> alone don't bypass the requirement on unsigned builds. See
+> `electron/main.ts` (protocol handler + IPC), `src/audio/AudioEngine.ts`
+> (PermissionDeniedError), `src/components/PermissionsBanner.tsx`.

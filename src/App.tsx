@@ -31,6 +31,7 @@ import { MultiTrackPanel } from './components/MultiTrackPanel';
 import { EmptyState } from './components/EmptyState';
 import { ScanOverlay } from './components/ScanOverlay';
 import { Toast } from './components/Toast';
+import { PermissionsBanner } from './components/PermissionsBanner';
 import { QuickTagDialog } from './components/QuickTagDialog';
 import { useLibrary } from './store/library';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
@@ -96,6 +97,7 @@ export default function App() {
       </div>
       {scanning && <ScanOverlay />}
       <Toast />
+      <PermissionsBanner />
       <QuickTagDialog />
     </div>
   );
